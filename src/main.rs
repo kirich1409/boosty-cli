@@ -6,6 +6,7 @@ mod config;
 mod error;
 mod levels;
 mod output;
+mod subscribers;
 mod user;
 
 #[cfg(test)]
@@ -26,6 +27,7 @@ enum Ran {
     User(api::user::UserResponse),
     SubscriptionLevels(api::levels::SubscriptionLevelsResponse),
     Subscriptions(api::levels::SubscriptionsResponse),
+    Subscribers(api::subscribers::SubscribersResponse),
 }
 
 #[tokio::main]
@@ -65,6 +67,10 @@ async fn dispatch() -> i32 {
         }
         Ok(Ran::Subscriptions(body)) => {
             output::print_subscriptions(parsed.json, &body);
+            0
+        }
+        Ok(Ran::Subscribers(body)) => {
+            output::print_subscribers(parsed.json, &body);
             0
         }
         Err(fail) => {
@@ -144,6 +150,14 @@ async fn run(command: Command) -> Result<Ran, Fail> {
         Command::Subscriptions { .. } => levels::run_subscriptions(env.api_key.as_deref(), &http)
             .await
             .map(Ran::Subscriptions),
+        Command::Subscribers {
+            is_free,
+            limit,
+            offset,
+            ..
+        } => subscribers::run_subscribers(env.api_key.as_deref(), &http, is_free, limit, offset)
+            .await
+            .map(Ran::Subscribers),
     }
 }
 

@@ -123,6 +123,51 @@ pub(crate) enum Command {
         )]
         help: Option<bool>,
     },
+
+    #[command(
+        name = "subscribers",
+        about = "Показать подписчиков",
+        disable_help_flag = true,
+        disable_version_flag = true,
+        disable_colored_help = true,
+        override_usage = "boosty subscribers [ПАРАМЕТРЫ]",
+        help_template = HELP_TEMPLATE
+    )]
+    Subscribers {
+        #[arg(
+            short = 'h',
+            long = "help",
+            action = ArgAction::Help,
+            help = "Показать справку",
+            help_heading = "Параметры"
+        )]
+        help: Option<bool>,
+
+        #[arg(
+            long,
+            value_parser = clap::builder::BoolValueParser::new(),
+            hide_possible_values = true,
+            help = "Только бесплатные при true, только платные при false",
+            help_heading = "Параметры"
+        )]
+        is_free: Option<bool>,
+
+        #[arg(
+            long,
+            allow_negative_numbers = true,
+            help = "Лимит записей",
+            help_heading = "Параметры"
+        )]
+        limit: Option<i64>,
+
+        #[arg(
+            long,
+            allow_negative_numbers = true,
+            help = "Смещение следующей страницы",
+            help_heading = "Параметры"
+        )]
+        offset: Option<i64>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

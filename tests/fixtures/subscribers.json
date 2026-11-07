@@ -1,0 +1,53 @@
+{
+  "users": [
+    {
+      "id": 7100000001,
+      "name": "Nori Kade",
+      "email": "nori.kade@page-subs.invalid",
+      "avatarUrl": "https://cdn.page-subs.invalid/nori.png",
+      "flags": {
+        "isAuthor": true,
+        "isBanned": false
+      },
+      "ignoredField": "fixture-extra-subs-4k"
+    },
+    {
+      "id": 7100000002,
+      "name": "Mira Sol",
+      "email": "mira.sol@page-subs.invalid",
+      "avatarUrl": "https://cdn.page-subs.invalid/mira.png",
+      "flags": {
+        "isAuthor": false,
+        "isBanned": true
+      }
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": 7200000001,
+      "ownerId": 7400000011,
+      "levelId": 7500000011,
+      "startTime": 0,
+      "endTime": 0,
+      "nextPayTime": 0,
+      "subscriberId": 7100000001,
+      "payments": "ZZZ4.00"
+    },
+    {
+      "id": 7200000002,
+      "ownerId": 7400000012,
+      "levelId": 7500000012,
+      "startTime": 1700000000,
+      "endTime": 0,
+      "nextPayTime": 0,
+      "subscriberId": 7300000099,
+      "payments": "ZZZ4.00",
+      "ignoredField": "fixture-extra-sub-4k"
+    }
+  ],
+  "extra": {
+    "nextOffset": 9100000007,
+    "ignoredField": "fixture-extra-cursor-4k"
+  },
+  "ignoredField": "fixture-extra-page-4k"
+}

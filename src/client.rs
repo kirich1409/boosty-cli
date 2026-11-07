@@ -155,12 +155,36 @@ impl ApiClient {
         self.get_with_api_key("subscriptions", api_key).await
     }
 
+    pub(crate) async fn subscribers<T: DeserializeOwned>(
+        &self,
+        api_key: &str,
+        is_free: Option<bool>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<T, Fail> {
+        let mut url = self.devapi_url("subscribers")?;
+        let pairs = subscriber_query(is_free, limit, offset);
+        // Empty pairs must not touch the query serializer. A bare '?' makes the
+        // recorded query non-empty and breaks the no-query DevAPI reads.
+        if !pairs.is_empty() {
+            let mut query = url.query_pairs_mut();
+            for (key, value) in &pairs {
+                query.append_pair(key, value);
+            }
+        }
+        self.send_api_key(url, api_key).await
+    }
+
     async fn get_with_api_key<T: DeserializeOwned>(
         &self,
         segment: &str,
         api_key: &str,
     ) -> Result<T, Fail> {
         let url = self.devapi_url(segment)?;
+        self.send_api_key(url, api_key).await
+    }
+
+    async fn send_api_key<T: DeserializeOwned>(&self, url: Url, api_key: &str) -> Result<T, Fail> {
         let response = self
             .http
             .get(url)
@@ -186,4 +210,29 @@ impl ApiClient {
         }
         base.join(segment).map_err(|_| Fail::bad_base_url())
     }
+}
+
+fn subscriber_query(
+    is_free: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Vec<(&'static str, String)> {
+    let mut pairs = Vec::new();
+    if let Some(value) = is_free {
+        pairs.push((
+            "is_free",
+            if value {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            },
+        ));
+    }
+    if let Some(value) = limit {
+        pairs.push(("limit", value.to_string()));
+    }
+    if let Some(value) = offset {
+        pairs.push(("offset", value.to_string()));
+    }
+    pairs
 }

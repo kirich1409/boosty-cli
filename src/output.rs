@@ -6,6 +6,7 @@ use chrono::{DateTime, Local};
 use crate::api::levels::{
     Subscription, SubscriptionLevel, SubscriptionLevelsResponse, SubscriptionsResponse,
 };
+use crate::api::subscribers::{SubscriberSubscription, SubscriberUser, SubscribersResponse};
 use crate::api::user::UserResponse;
 use crate::error::Fail;
 
@@ -85,6 +86,19 @@ pub(crate) fn print_subscriptions(json: bool, body: &SubscriptionsResponse) {
     let _ = write_stdout(&render_subscriptions(json, body));
 }
 
+pub(crate) fn render_subscribers(json: bool, body: &SubscribersResponse) -> String {
+    if json {
+        let text = serde_json::to_string(body).expect("subscribers response serializes");
+        format!("{text}\n")
+    } else {
+        render_subscribers_human(body)
+    }
+}
+
+pub(crate) fn print_subscribers(json: bool, body: &SubscribersResponse) {
+    let _ = write_stdout(&render_subscribers(json, body));
+}
+
 pub(crate) fn print_fail(json: bool, fail: &Fail) {
     let _ = write_stderr(&render_fail(json, fail));
 }
@@ -147,6 +161,59 @@ fn render_level(level: &SubscriptionLevel) -> String {
         lines.push("удалён".to_string());
     }
     lines.join("\n")
+}
+
+fn render_subscribers_human(body: &SubscribersResponse) -> String {
+    let mut text = String::from("Подписчики\n");
+    let users = join_blocks(body.users.iter().map(render_subscriber_user));
+    if !users.is_empty() {
+        text.push_str(&users);
+        text.push('\n');
+    }
+    text.push_str("Подписки\n");
+    let subscriptions = join_blocks(
+        body.subscriptions
+            .iter()
+            .map(render_subscriber_subscription),
+    );
+    if !subscriptions.is_empty() {
+        text.push_str(&subscriptions);
+        text.push('\n');
+    }
+    if let Some(extra) = &body.extra {
+        let offset = extra.nextOffset;
+        text.push_str(&format!("следующее смещение: {offset}\n"));
+    }
+    text
+}
+
+fn render_subscriber_user(user: &SubscriberUser) -> String {
+    format!(
+        "Имя: {}\nНомер: {}\nПочта: {}\nАватар: {}\nАвтор: {}\nЗаблокирован: {}",
+        user.name,
+        user.id,
+        user.email,
+        user.avatarUrl,
+        yes_no(user.flags.isAuthor),
+        yes_no(user.flags.isBanned),
+    )
+}
+
+fn render_subscriber_subscription(subscription: &SubscriberSubscription) -> String {
+    [
+        format!("номер: {}", subscription.id),
+        format!("владелец: {}", subscription.ownerId),
+        format!("уровень: {}", subscription.levelId),
+        format!("подписчик: {}", subscription.subscriberId),
+        format!("начало: {}", display_time(subscription.startTime)),
+        format!("конец: {}", display_time(subscription.endTime)),
+        format!(
+            "следующая оплата: {}",
+            display_time(subscription.nextPayTime)
+        ),
+        format!("платежи: {}", subscription.payments),
+    ]
+    .join("\n")
 }
 
 fn render_subscription(subscription: &Subscription) -> String {
