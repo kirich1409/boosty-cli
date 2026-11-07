@@ -1,0 +1,52 @@
+{
+  "subscriptions": [
+    {
+      "id": 5000000001,
+      "ownerId": 8200000011,
+      "levelId": 4000000001,
+      "startTime": 1700000000,
+      "endTime": 0,
+      "nextPayTime": 0,
+      "subscriberId": 8300000011,
+      "payments": "ZZZ4.00",
+      "ignoredField": "fixture-extra-sub-9q"
+    },
+    {
+      "id": 5000000002,
+      "ownerId": 8200000012,
+      "levelId": 9900000099,
+      "startTime": 1700000500,
+      "endTime": 1700000600,
+      "nextPayTime": 1700000700,
+      "subscriberId": 8300000012,
+      "payments": "kept-plain"
+    }
+  ],
+  "subscriptionLevels": [
+    {
+      "id": 4000000001,
+      "price": "AAA1.20",
+      "authorId": 8100000011,
+      "name": "Polka",
+      "createTime": 1700000000,
+      "isDeleted": false
+    },
+    {
+      "id": 4000000004,
+      "price": "price-open",
+      "authorId": 8100000014,
+      "name": "Smena",
+      "createTime": 0,
+      "isDeleted": true,
+      "ignoredField": "fixture-extra-level-9q"
+    },
+    {
+      "id": 4000000005,
+      "price": "BBB2.00",
+      "authorId": 8100000015,
+      "name": "Orbita",
+      "createTime": 1690000000,
+      "isDeleted": false
+    }
+  ]
+}

@@ -17,6 +17,7 @@ pub(crate) struct Env {
     pub authorize_url: Option<String>,
     pub token_url: Option<String>,
     pub devapi_base: Option<String>,
+    pub api_key: Option<String>,
 }
 
 impl Env {
@@ -31,6 +32,7 @@ impl Env {
             authorize_url: non_empty("BOOSTY_AUTHORIZE_URL"),
             token_url: non_empty("BOOSTY_TOKEN_URL"),
             devapi_base: non_empty("BOOSTY_DEVAPI_BASE"),
+            api_key: non_empty("BOOSTY_API_KEY"),
         }
     }
 }

@@ -212,6 +212,39 @@ fn help_is_russian_not_clap_english_template() {
 }
 
 #[test]
+fn help_pages_are_russian() {
+    let root = run(&["--help"], &[]);
+    let levels = run(&["subscription-levels", "--help"], &[]);
+    let subscriptions = run(&["subscriptions", "--help"], &[]);
+    let user = run(&["user", "--help"], &[]);
+    let auth = run(&["auth", "--help"], &[]);
+    for page in [&root, &levels, &subscriptions, &user, &auth] {
+        assert_eq!(page.code, 0, "{}", page.stderr);
+        assert!(!page.stdout.contains("Print help"), "{}", page.stdout);
+        assert!(
+            !page
+                .stdout
+                .contains("Print this message or the help of the given subcommand(s)"),
+            "{}",
+            page.stdout
+        );
+        assert!(!page.stderr.contains("Print help"));
+    }
+    assert!(levels.stdout.contains("Показать уровни подписки"));
+    assert!(subscriptions.stdout.contains("Показать подписки"));
+    assert!(root.stdout.contains("Показать уровни подписки"));
+    assert!(root.stdout.contains("Показать подписки"));
+    assert!(root.stdout.contains("Показать текущего пользователя"));
+    assert!(root.stdout.contains("Вход и токен"));
+    assert!(user.stdout.contains("Показать текущего пользователя"));
+    assert!(auth.stdout.contains("Открыть браузер и сохранить токен"));
+    assert!(auth.stdout.contains("Обновить токен"));
+    assert!(auth.stdout.contains("Показать срок токена и путь к файлу"));
+    assert!(levels.stdout.contains('а') || levels.stdout.contains('П'));
+    assert!(subscriptions.stdout.contains('а') || subscriptions.stdout.contains('П'));
+}
+
+#[test]
 fn extra_positional_or_secret_flag_is_usage() {
     let cases = [
         vec!["auth", "login", "extra"],

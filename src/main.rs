@@ -4,6 +4,7 @@ mod cli;
 mod client;
 mod config;
 mod error;
+mod levels;
 mod output;
 mod user;
 
@@ -11,7 +12,7 @@ mod user;
 mod tests;
 
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use clap::error::ErrorKind;
@@ -23,6 +24,8 @@ use crate::error::Fail;
 enum Ran {
     Session(output::SessionView),
     User(api::user::UserResponse),
+    SubscriptionLevels(api::levels::SubscriptionLevelsResponse),
+    Subscriptions(api::levels::SubscriptionsResponse),
 }
 
 #[tokio::main]
@@ -56,6 +59,14 @@ async fn dispatch() -> i32 {
             output::print_user(parsed.json, &body);
             0
         }
+        Ok(Ran::SubscriptionLevels(body)) => {
+            output::print_subscription_levels(parsed.json, &body);
+            0
+        }
+        Ok(Ran::Subscriptions(body)) => {
+            output::print_subscriptions(parsed.json, &body);
+            0
+        }
         Err(fail) => {
             output::print_fail(parsed.json, &fail);
             fail.code()
@@ -72,13 +83,9 @@ async fn run(command: Command) -> Result<Ran, Fail> {
     )?;
     let authorize = hosts.authorize.clone();
     let http = client::ApiClient::build(client::HTTP_TIMEOUT, hosts)?;
-    let path = config::token_path(
-        env.token_path.as_deref(),
-        env.xdg_config_home.as_deref(),
-        env.home.as_deref(),
-    )?;
     match command {
         Command::Auth { action, .. } => {
+            let path = resolve_token_path(&env)?;
             let view = match action {
                 AuthCommand::Login { .. } => {
                     auth::run_login(
@@ -116,17 +123,36 @@ async fn run(command: Command) -> Result<Ran, Fail> {
             };
             view.map(Ran::Session)
         }
-        Command::User { .. } => user::run_user(
-            env.client_id.as_deref(),
-            env.client_secret.as_deref(),
-            &path,
-            &http,
-            SystemTime::now,
-            rename_file,
-        )
-        .await
-        .map(Ran::User),
+        Command::User { .. } => {
+            let path = resolve_token_path(&env)?;
+            user::run_user(
+                env.client_id.as_deref(),
+                env.client_secret.as_deref(),
+                &path,
+                &http,
+                SystemTime::now,
+                rename_file,
+            )
+            .await
+            .map(Ran::User)
+        }
+        Command::SubscriptionLevels { .. } => {
+            levels::run_subscription_levels(env.api_key.as_deref(), &http)
+                .await
+                .map(Ran::SubscriptionLevels)
+        }
+        Command::Subscriptions { .. } => levels::run_subscriptions(env.api_key.as_deref(), &http)
+            .await
+            .map(Ran::Subscriptions),
     }
+}
+
+fn resolve_token_path(env: &config::Env) -> Result<PathBuf, Fail> {
+    config::token_path(
+        env.token_path.as_deref(),
+        env.xdg_config_home.as_deref(),
+        env.home.as_deref(),
+    )
 }
 
 fn rename_file(from: &Path, to: &Path) -> io::Result<()> {

@@ -124,7 +124,7 @@ impl ApiClient {
         &self,
         access_token: &str,
     ) -> Result<T, Fail> {
-        let url = self.user_url()?;
+        let url = self.devapi_url("user")?;
         let authorization = format!("Bearer {access_token}");
         let response = self
             .http
@@ -141,7 +141,42 @@ impl ApiClient {
         serde_json::from_slice(&bytes).map_err(|_| Fail::user_api())
     }
 
-    fn user_url(&self) -> Result<Url, Fail> {
+    pub(crate) async fn subscription_levels<T: DeserializeOwned>(
+        &self,
+        api_key: &str,
+    ) -> Result<T, Fail> {
+        self.get_with_api_key("subscription_levels", api_key).await
+    }
+
+    pub(crate) async fn subscriptions<T: DeserializeOwned>(
+        &self,
+        api_key: &str,
+    ) -> Result<T, Fail> {
+        self.get_with_api_key("subscriptions", api_key).await
+    }
+
+    async fn get_with_api_key<T: DeserializeOwned>(
+        &self,
+        segment: &str,
+        api_key: &str,
+    ) -> Result<T, Fail> {
+        let url = self.devapi_url(segment)?;
+        let response = self
+            .http
+            .get(url)
+            .header("X-Api-Key", api_key)
+            .send()
+            .await
+            .map_err(|_| Fail::devapi())?;
+        let status = response.status();
+        let bytes = response.bytes().await.map_err(|_| Fail::devapi())?;
+        if !status.is_success() {
+            return Err(Fail::devapi());
+        }
+        serde_json::from_slice(&bytes).map_err(|_| Fail::devapi())
+    }
+
+    fn devapi_url(&self, segment: &str) -> Result<Url, Fail> {
         let mut base = self.devapi.clone();
         // Url::join replaces the last segment unless the path ends with '/'.
         if !base.path().ends_with('/') {
@@ -149,6 +184,6 @@ impl ApiClient {
                 .map_err(|_| Fail::bad_base_url())?
                 .push("");
         }
-        base.join("user").map_err(|_| Fail::bad_base_url())
+        base.join(segment).map_err(|_| Fail::bad_base_url())
     }
 }

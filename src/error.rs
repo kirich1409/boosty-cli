@@ -191,6 +191,14 @@ impl Fail {
         )
     }
 
+    pub(crate) fn missing_api_key() -> Self {
+        Self::new(Kind::Auth, "missing API key", "Нет ключа API.")
+    }
+
+    pub(crate) fn devapi() -> Self {
+        Self::new(Kind::Api, "DevAPI request failed", "Сбой запроса к DevAPI.")
+    }
+
     pub(crate) fn kind(&self) -> Kind {
         self.kind
     }

@@ -83,6 +83,46 @@ pub(crate) enum Command {
         )]
         help: Option<bool>,
     },
+
+    #[command(
+        name = "subscription-levels",
+        about = "Показать уровни подписки",
+        disable_help_flag = true,
+        disable_version_flag = true,
+        disable_colored_help = true,
+        override_usage = "boosty subscription-levels [ПАРАМЕТРЫ]",
+        help_template = HELP_TEMPLATE
+    )]
+    SubscriptionLevels {
+        #[arg(
+            short = 'h',
+            long = "help",
+            action = ArgAction::Help,
+            help = "Показать справку",
+            help_heading = "Параметры"
+        )]
+        help: Option<bool>,
+    },
+
+    #[command(
+        name = "subscriptions",
+        about = "Показать подписки",
+        disable_help_flag = true,
+        disable_version_flag = true,
+        disable_colored_help = true,
+        override_usage = "boosty subscriptions [ПАРАМЕТРЫ]",
+        help_template = HELP_TEMPLATE
+    )]
+    Subscriptions {
+        #[arg(
+            short = 'h',
+            long = "help",
+            action = ArgAction::Help,
+            help = "Показать справку",
+            help_heading = "Параметры"
+        )]
+        help: Option<bool>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

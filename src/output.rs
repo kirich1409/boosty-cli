@@ -3,6 +3,9 @@ use std::path::Path;
 
 use chrono::{DateTime, Local};
 
+use crate::api::levels::{
+    Subscription, SubscriptionLevel, SubscriptionLevelsResponse, SubscriptionsResponse,
+};
 use crate::api::user::UserResponse;
 use crate::error::Fail;
 
@@ -49,6 +52,39 @@ pub(crate) fn print_user(json: bool, body: &UserResponse) {
     let _ = write_stdout(&render_user(json, body));
 }
 
+pub(crate) fn render_subscription_levels(json: bool, body: &SubscriptionLevelsResponse) -> String {
+    if json {
+        let text = serde_json::to_string(body).expect("subscription levels response serializes");
+        format!("{text}\n")
+    } else {
+        render_levels_section(&body.subscriptionLevels)
+    }
+}
+
+pub(crate) fn print_subscription_levels(json: bool, body: &SubscriptionLevelsResponse) {
+    let _ = write_stdout(&render_subscription_levels(json, body));
+}
+
+pub(crate) fn render_subscriptions(json: bool, body: &SubscriptionsResponse) -> String {
+    if json {
+        let text = serde_json::to_string(body).expect("subscriptions response serializes");
+        format!("{text}\n")
+    } else {
+        let mut text = render_levels_section(&body.subscriptionLevels);
+        text.push_str("Подписки\n");
+        let blocks = join_blocks(body.subscriptions.iter().map(render_subscription));
+        if !blocks.is_empty() {
+            text.push_str(&blocks);
+            text.push('\n');
+        }
+        text
+    }
+}
+
+pub(crate) fn print_subscriptions(json: bool, body: &SubscriptionsResponse) {
+    let _ = write_stdout(&render_subscriptions(json, body));
+}
+
 pub(crate) fn print_fail(json: bool, fail: &Fail) {
     let _ = write_stderr(&render_fail(json, fail));
 }
@@ -88,6 +124,105 @@ fn render_json(view: &SessionView) -> String {
         "path": path_string(&view.path),
     });
     format!("{value}\n")
+}
+
+fn render_levels_section(levels: &[SubscriptionLevel]) -> String {
+    let mut text = String::from("Уровни\n");
+    let blocks = join_blocks(levels.iter().map(render_level));
+    if !blocks.is_empty() {
+        text.push_str(&blocks);
+        text.push('\n');
+    }
+    text
+}
+
+fn render_level(level: &SubscriptionLevel) -> String {
+    let mut lines = vec![
+        level.name.clone(),
+        format!("номер: {}", level.id),
+        format!("цена: {}", display_price(&level.price)),
+        format!("создан: {}", display_time(level.createTime)),
+    ];
+    if level.isDeleted {
+        lines.push("удалён".to_string());
+    }
+    lines.join("\n")
+}
+
+fn render_subscription(subscription: &Subscription) -> String {
+    [
+        format!("номер: {}", subscription.id),
+        format!("владелец: {}", subscription.ownerId),
+        format!("уровень: {}", subscription.levelId),
+        format!("подписчик: {}", subscription.subscriberId),
+        format!("начало: {}", display_time(subscription.startTime)),
+        format!("конец: {}", display_time(subscription.endTime)),
+        format!(
+            "следующая оплата: {}",
+            display_time(subscription.nextPayTime)
+        ),
+        format!("платежи: {}", subscription.payments),
+    ]
+    .join("\n")
+}
+
+fn join_blocks(blocks: impl Iterator<Item = String>) -> String {
+    let mut text = String::new();
+    for (index, block) in blocks.enumerate() {
+        if index > 0 {
+            text.push_str("\n\n");
+        }
+        text.push_str(&block);
+    }
+    text
+}
+
+fn display_price(price: &str) -> String {
+    let prefix_len = price
+        .bytes()
+        .position(|byte| !byte.is_ascii_alphabetic())
+        .unwrap_or(price.len());
+    if prefix_len == 0 || prefix_len == price.len() {
+        return price.to_string();
+    }
+    let amount = &price[prefix_len..];
+    if is_amount(amount) {
+        format!("{amount} {}", &price[..prefix_len])
+    } else {
+        price.to_string()
+    }
+}
+
+fn is_amount(value: &str) -> bool {
+    let mut split = value.split('.');
+    let Some(whole) = split.next() else {
+        return false;
+    };
+    if whole.is_empty() || !whole.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    match split.next() {
+        None => true,
+        Some(fraction) => {
+            !fraction.is_empty()
+                && fraction.bytes().all(|byte| byte.is_ascii_digit())
+                && split.next().is_none()
+        }
+    }
+}
+
+// Zero is «нет» only here. Auth expiry still goes through local_stamp.
+fn display_time(stamp: i64) -> String {
+    if stamp == 0 {
+        return "нет".to_string();
+    }
+    DateTime::from_timestamp(stamp, 0)
+        .map(|utc| {
+            utc.with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
+        .unwrap_or_else(|| stamp.to_string())
 }
 
 fn local_stamp(expires_at: i64) -> String {

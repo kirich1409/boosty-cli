@@ -1,0 +1,29 @@
+{
+  "subscriptionLevels": [
+    {
+      "id": 4000000001,
+      "price": "AAA1.20",
+      "authorId": 8100000011,
+      "name": "Polka",
+      "createTime": 1700000000,
+      "isDeleted": false,
+      "ignoredField": "fixture-extra-polka-9q"
+    },
+    {
+      "id": 4000000002,
+      "price": "price-open",
+      "authorId": 8100000012,
+      "name": "Smena",
+      "createTime": 0,
+      "isDeleted": true
+    },
+    {
+      "id": 4000000003,
+      "price": "AAA 1.20",
+      "authorId": 8100000013,
+      "name": "Lenta",
+      "createTime": 1700000100,
+      "isDeleted": false
+    }
+  ]
+}
