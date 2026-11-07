@@ -1,0 +1,361 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Match the tag to Cargo.toml
+        run: |
+          set -euo pipefail
+          ref_type="${{ github.ref_type }}"
+          tag="${{ github.ref_name }}"
+          if [ "$ref_type" != "tag" ]; then
+            echo "ref type is a branch or a ref without a tag" >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag is not vX.Y.Z" >&2
+            exit 1
+          fi
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml)"
+          if [ -z "$version" ] || [ "$tag" != "v${version}" ]; then
+            echo "tag does not match v plus Cargo.toml version" >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=${tag}" >> "$GITHUB_ENV"
+
+      - name: Refuse an existing release
+        run: |
+          set -euo pipefail
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "release already exists" >&2
+            exit 1
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,aarch64-apple-darwin,x86_64-apple-darwin,x86_64-pc-windows-gnu
+
+      - name: Install cmake and nasm
+        run: brew install cmake nasm
+
+      # aws-lc-rs 1.19.0 already builds these zigbuild targets on macos-latest with zig 0.15.2.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: "0.15.2"
+
+      - name: Install cargo-zigbuild
+        run: cargo install --locked cargo-zigbuild
+
+      - name: Build release binaries
+        run: |
+          set -euo pipefail
+          unset RUSTFLAGS || true
+          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+          cargo zigbuild --release --locked --target x86_64-unknown-linux-gnu
+          cargo zigbuild --release --locked --target aarch64-unknown-linux-gnu
+          if ! RUSTFLAGS="-C target-feature=+crt-static" cargo zigbuild --release --locked --target x86_64-pc-windows-gnu; then
+            cargo zigbuild --release --locked --target x86_64-pc-windows-gnu
+            printf 'dynamic\n' > "${RUNNER_TEMP}/windows-crt"
+          else
+            printf 'static\n' > "${RUNNER_TEMP}/windows-crt"
+          fi
+
+      - name: Pack archives and checksums
+        run: |
+          set -euo pipefail
+          dist="${RUNNER_TEMP}/dist"
+          mkdir -p "$dist"
+          package_unix() {
+            triple="$1"
+            archive="$2"
+            stage="$(mktemp -d)"
+            cp "target/${triple}/release/boosty" "${stage}/boosty"
+            chmod +x "${stage}/boosty"
+            tar -C "$stage" -czf "${dist}/${archive}" boosty
+            rm -rf "$stage"
+          }
+          package_unix x86_64-unknown-linux-gnu boosty-linux-x86_64.tar.gz
+          package_unix aarch64-unknown-linux-gnu boosty-linux-aarch64.tar.gz
+          package_unix aarch64-apple-darwin boosty-macos-aarch64.tar.gz
+          package_unix x86_64-apple-darwin boosty-macos-x86_64.tar.gz
+          stage="$(mktemp -d)"
+          cp "target/x86_64-pc-windows-gnu/release/boosty.exe" "${stage}/boosty.exe"
+          if [ "$(cat "${RUNNER_TEMP}/windows-crt")" != "static" ]; then
+            python3 - "${stage}/boosty.exe" "$stage" <<'PY'
+          import json
+          import pathlib
+          import shutil
+          import struct
+          import subprocess
+          import sys
+
+          exe = pathlib.Path(sys.argv[1])
+          dest = pathlib.Path(sys.argv[2])
+          SYSTEM = {
+              "advapi32.dll",
+              "bcrypt.dll",
+              "bcryptprimitives.dll",
+              "cabinet.dll",
+              "cfgmgr32.dll",
+              "combase.dll",
+              "comdlg32.dll",
+              "crypt32.dll",
+              "cryptbase.dll",
+              "dbghelp.dll",
+              "dnsapi.dll",
+              "gdi32.dll",
+              "gdi32full.dll",
+              "imagehlp.dll",
+              "imm32.dll",
+              "iphlpapi.dll",
+              "kernel32.dll",
+              "kernelbase.dll",
+              "msvcrt.dll",
+              "normaliz.dll",
+              "nsi.dll",
+              "ntdll.dll",
+              "ole32.dll",
+              "oleacc.dll",
+              "oleaut32.dll",
+              "powrprof.dll",
+              "profapi.dll",
+              "propsys.dll",
+              "psapi.dll",
+              "rpcrt4.dll",
+              "sechost.dll",
+              "secur32.dll",
+              "setupapi.dll",
+              "shcore.dll",
+              "shell32.dll",
+              "shlwapi.dll",
+              "sspicli.dll",
+              "ucrtbase.dll",
+              "user32.dll",
+              "userenv.dll",
+              "version.dll",
+              "wintrust.dll",
+              "ws2_32.dll",
+              "wsock32.dll",
+          }
+
+          def is_system(name):
+              low = name.lower()
+              return low in SYSTEM or low.startswith(("api-ms-", "ext-ms-"))
+
+          def pe_imports(blob):
+              if blob[:2] != b"MZ":
+                  raise SystemExit("windows binary is not PE")
+              pe = struct.unpack_from("<I", blob, 0x3C)[0]
+              if blob[pe : pe + 4] != b"PE\0\0":
+                  raise SystemExit("windows binary is not PE")
+              coff = pe + 4
+              nsections = struct.unpack_from("<H", blob, coff + 2)[0]
+              opt_size = struct.unpack_from("<H", blob, coff + 16)[0]
+              opt = pe + 24
+              magic = struct.unpack_from("<H", blob, opt)[0]
+              if magic == 0x20B:
+                  directories = opt + 112
+              elif magic == 0x10B:
+                  directories = opt + 96
+              else:
+                  raise SystemExit("unknown PE magic")
+              import_rva, import_size = struct.unpack_from("<II", blob, directories + 8)
+              sections = []
+              sec = opt + opt_size
+              for index in range(nsections):
+                  off = sec + index * 40
+                  _name, _vsize, va, rawsize, rawptr = struct.unpack_from("<8sIIII", blob, off)
+                  sections.append((va, rawsize, rawptr))
+
+              def rva_to_off(rva):
+                  for va, rawsize, rawptr in sections:
+                      if va <= rva < va + rawsize:
+                          return rawptr + (rva - va)
+                  raise SystemExit("import rva is not in a section")
+
+              if import_rva == 0 or import_size == 0:
+                  return []
+              names = []
+              off = rva_to_off(import_rva)
+              while True:
+                  ilt, _ts, _fc, name_rva, iat = struct.unpack_from("<IIIII", blob, off)
+                  if ilt == 0 and name_rva == 0 and iat == 0:
+                      break
+                  name_off = rva_to_off(name_rva)
+                  end = blob.index(b"\0", name_off)
+                  names.append(blob[name_off:end].decode("ascii"))
+                  off += 20
+              return names
+
+          needed = [name for name in pe_imports(exe.read_bytes()) if not is_system(name)]
+          if not needed:
+              sys.exit(0)
+          env = json.loads(subprocess.check_output(["zig", "env"], text=True))
+          roots = [pathlib.Path(env["lib_dir"]), exe.parent]
+          zig = shutil.which("zig")
+          if zig:
+              roots.append(pathlib.Path(zig).resolve().parent)
+          missing = []
+          for name in needed:
+              found = None
+              for root in roots:
+                  if not root.exists():
+                      continue
+                  matches = [path for path in root.rglob(name) if path.is_file()]
+                  if matches:
+                      found = matches[0]
+                      break
+              if found is None:
+                  missing.append(name)
+                  continue
+              target = dest / name
+              if target.resolve() != found.resolve():
+                  target.write_bytes(found.read_bytes())
+          if missing:
+              print("missing windows runtime DLL: " + ", ".join(missing), file=sys.stderr)
+              sys.exit(1)
+          PY
+          fi
+          zip -j -X "${dist}/boosty-windows-x86_64.zip" "${stage}/boosty.exe"
+          if [ "$(cat "${RUNNER_TEMP}/windows-crt")" != "static" ]; then
+            shopt -s nullglob
+            dlls=("${stage}/"*.dll)
+            if [ "${#dlls[@]}" -gt 0 ]; then
+              zip -j -X "${dist}/boosty-windows-x86_64.zip" "${dlls[@]}"
+            fi
+          fi
+          (
+            cd "$dist"
+            shasum -a 256 \
+              boosty-linux-x86_64.tar.gz \
+              boosty-linux-aarch64.tar.gz \
+              boosty-macos-aarch64.tar.gz \
+              boosty-macos-x86_64.tar.gz \
+              boosty-windows-x86_64.zip \
+              > SHA256SUMS
+          )
+
+      - name: Write release notes
+        run: sh scripts/release-notes.sh "${RELEASE_VERSION}" > "${RUNNER_TEMP}/release-notes.md"
+
+      - name: Create release
+        run: |
+          set -euo pipefail
+          gh release create "${RELEASE_TAG}" \
+            --notes-file "${RUNNER_TEMP}/release-notes.md" \
+            "${RUNNER_TEMP}/dist/boosty-linux-x86_64.tar.gz" \
+            "${RUNNER_TEMP}/dist/boosty-linux-aarch64.tar.gz" \
+            "${RUNNER_TEMP}/dist/boosty-macos-aarch64.tar.gz" \
+            "${RUNNER_TEMP}/dist/boosty-macos-x86_64.tar.gz" \
+            "${RUNNER_TEMP}/dist/boosty-windows-x86_64.zip" \
+            "${RUNNER_TEMP}/dist/SHA256SUMS"
+
+      - name: Record notes and checksums on main
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          if [ ! -f CHANGELOG.md ] || [ ! -f Formula/boosty.rb ] || [ ! -f bucket/boosty.json ]; then
+            echo "main is missing the changelog or an install manifest" >&2
+            exit 1
+          fi
+          main_version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml)"
+          if [ "$main_version" != "${RELEASE_VERSION}" ]; then
+            echo "main Cargo.toml version does not match the release" >&2
+            exit 1
+          fi
+          if grep -qx "## ${RELEASE_VERSION}" CHANGELOG.md; then
+            echo "changelog section already exists" >&2
+            exit 1
+          fi
+          python3 - "${RELEASE_VERSION}" "${RUNNER_TEMP}/dist/SHA256SUMS" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          version = sys.argv[1]
+          sums_path = pathlib.Path(sys.argv[2])
+          sums = {}
+          for line in sums_path.read_text().splitlines():
+              if not line.strip():
+                  continue
+              digest, name = line.split("  ", 1)
+              if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                  print(f"checksum is not lowercase sha256: {name}", file=sys.stderr)
+                  sys.exit(1)
+              sums[name] = digest
+
+          unix = [
+              "boosty-linux-x86_64.tar.gz",
+              "boosty-linux-aarch64.tar.gz",
+              "boosty-macos-aarch64.tar.gz",
+              "boosty-macos-x86_64.tar.gz",
+          ]
+          windows = "boosty-windows-x86_64.zip"
+          formula_path = pathlib.Path("Formula/boosty.rb")
+          manifest_path = pathlib.Path("bucket/boosty.json")
+          formula = formula_path.read_text()
+          urls = re.findall(r'url\s+"([^"]+)"', formula)
+          if len(urls) != len(unix):
+              print("formula url count is not the four unix archives", file=sys.stderr)
+              sys.exit(1)
+          for name in unix:
+              hits = [url for url in urls if f"v{version}" in url and name in url]
+              if len(hits) != 1 or name not in sums:
+                  print(f"formula url does not contain v{version} and {name}", file=sys.stderr)
+                  sys.exit(1)
+          manifest = json.loads(manifest_path.read_text())
+          url = manifest.get("url", "")
+          if f"v{version}" not in url or windows not in url or windows not in sums:
+              print("manifest url does not contain the release archive", file=sys.stderr)
+              sys.exit(1)
+
+          lines = formula.splitlines(keepends=True)
+          updated = []
+          seen = set()
+          for line in lines:
+              updated.append(line)
+              found = re.search(r'url\s+"([^"]+)"', line)
+              if not found:
+                  continue
+              raw = found.group(1)
+              for name in unix:
+                  if f"v{version}" in raw and name in raw:
+                      indent = re.match(r"[ \t]*", line).group(0)
+                      updated.append(f'{indent}sha256 "{sums[name]}"\n')
+                      seen.add(name)
+                      break
+          if seen != set(unix):
+              print("not every unix url received a sha256", file=sys.stderr)
+              sys.exit(1)
+          formula_path.write_text("".join(updated))
+          manifest["hash"] = sums[windows]
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+          cat "${RUNNER_TEMP}/release-notes.md" >> CHANGELOG.md
+          git add CHANGELOG.md Formula/boosty.rb bucket/boosty.json
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Add release notes and checksums for ${RELEASE_VERSION}"
+          git push origin main

@@ -178,17 +178,19 @@ fn readme_has_no_install_channel_or_ci_badge() {
     let path = root().join("README.md");
     let text = read_text(&path);
     let check = "readme_has_no_install_channel_or_ci_badge";
+    // Install commands and the release URL template live in the install
+    // section. crates.io and cargo binstall are named there only to refuse
+    // them; release_layout rejects those as channels.
     for needle in [
-        "brew",
-        "scoop",
-        "cargo install",
-        "crates.io",
-        "GitHub Releases",
         "shields.io",
         "![",
         "скач",
         "Permission is hereby granted",
         "END OF TERMS AND CONDITIONS",
+        "homebrew-",
+        "winget",
+        "bucket add",
+        "https://crates.io",
     ] {
         assert_lacks(&path, check, &text, needle);
     }

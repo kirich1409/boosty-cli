@@ -47,6 +47,33 @@ cargo run --
 
 `cargo build` собирает бинарник `boosty`.
 
+## Установка
+
+Номер `0.1.0`, тег `v0.1.0`. Архивы лежат по шаблону:
+
+`https://github.com/kirich1409/boosty-cli/releases/download/v{version}/boosty-{target}.{ext}`
+
+macOS и Linux:
+
+```
+brew tap kirich1409/boosty-cli https://github.com/kirich1409/boosty-cli
+brew install kirich1409/boosty-cli/boosty
+```
+
+Windows:
+
+```
+scoop install https://raw.githubusercontent.com/kirich1409/boosty-cli/main/bucket/boosty.json
+```
+
+Из исходников:
+
+```
+cargo install --git https://github.com/kirich1409/boosty-cli
+```
+
+`cargo binstall` и crates.io не обещаны, потому что `publish = false`.
+
 ## Лицензия
 
 Код доступен по двойной лицензии `MIT OR Apache-2.0`. Тексты: `LICENSE-MIT` и `LICENSE-APACHE`.

@@ -151,6 +151,7 @@ When the live API disagrees with the spec, update the spec file and the matching
 - With `--json`, any log line on stdout breaks the caller. Warnings and the authorize URL go to stderr.
 - The token path stays under `~/.config/boosty-cli` on macOS so agents have one path. Do not switch it to Application Support.
 - Do not commit the token file, `.env`, or a filled `BOOSTY_TOKEN_PATH`. Gitignore those paths.
+- A release tag is `v` plus `version` from Cargo.toml, and the two sides match character for character. crates.io is off (`publish = false`). Install from this repository, not from a separate tap.
 
 ## Maintaining this file
 
