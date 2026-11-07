@@ -1,0 +1,7 @@
+{
+  "access_token": "access-test-1",
+  "expires_in": 100,
+  "token_type": "TestType",
+  "refresh_token": "refresh-test-1",
+  "ignored_field": "ignored-test-1"
+}
