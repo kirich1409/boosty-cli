@@ -69,7 +69,7 @@ fn fixture_does_not_copy_contract_samples() {
     }
 }
 
-fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
+pub(crate) fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
     match value {
         serde_json::Value::String(text) => out.push(text.clone()),
         serde_json::Value::Array(items) => {
@@ -86,7 +86,7 @@ fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
     }
 }
 
-fn json_strings(text: &str) -> Vec<String> {
+pub(crate) fn json_strings(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = text.as_bytes();
     let mut index = 0;

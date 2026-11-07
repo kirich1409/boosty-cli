@@ -64,6 +64,25 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: AuthCommand,
     },
+
+    #[command(
+        about = "Показать текущего пользователя",
+        disable_help_flag = true,
+        disable_version_flag = true,
+        disable_colored_help = true,
+        override_usage = "boosty user [ПАРАМЕТРЫ]",
+        help_template = HELP_TEMPLATE
+    )]
+    User {
+        #[arg(
+            short = 'h',
+            long = "help",
+            action = ArgAction::Help,
+            help = "Показать справку",
+            help_heading = "Параметры"
+        )]
+        help: Option<bool>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

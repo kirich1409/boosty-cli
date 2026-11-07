@@ -198,6 +198,17 @@ fn help_is_russian_not_clap_english_template() {
         );
         assert!(!page.stderr.contains("Print help"));
     }
+    assert!(pages[0].stdout.contains("Показать текущего пользователя"));
+    let user_help = run(&["user", "--help"], &[]);
+    assert_eq!(user_help.code, 0, "{}", user_help.stderr);
+    assert!(user_help.stdout.contains("Показать текущего пользователя"));
+    assert!(!user_help.stdout.contains("Print help"));
+    assert!(
+        !user_help
+            .stdout
+            .contains("Print this message or the help of the given subcommand(s)")
+    );
+    assert!(!user_help.stderr.contains("Print help"));
 }
 
 #[test]
@@ -206,6 +217,9 @@ fn extra_positional_or_secret_flag_is_usage() {
         vec!["auth", "login", "extra"],
         vec!["auth", "status", "--token", "secret"],
         vec!["auth", "refresh", "--refresh-token", "x"],
+        vec!["user", "extra"],
+        vec!["user", "--token", "secret"],
+        vec!["user", "--api-key", "secret"],
     ];
     for args in cases {
         let out = run(&args, &[]);
@@ -220,6 +234,12 @@ fn extra_positional_or_secret_flag_is_usage() {
         vec!["auth", "status", "--token", "secret", "--json"],
         vec!["--json", "auth", "refresh", "--refresh-token", "x"],
         vec!["auth", "refresh", "--json", "--refresh-token", "x"],
+        vec!["--json", "user", "extra"],
+        vec!["user", "--json", "extra"],
+        vec!["--json", "user", "--token", "secret"],
+        vec!["user", "--token", "secret", "--json"],
+        vec!["--json", "user", "--api-key", "secret"],
+        vec!["user", "--api-key", "secret", "--json"],
     ] {
         let out = run(&args, &[]);
         assert_eq!(out.code, 2, "{} {}", args.join(" "), out.stderr);

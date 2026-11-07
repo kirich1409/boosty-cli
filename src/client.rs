@@ -3,6 +3,7 @@ use std::time::Duration;
 use base64::Engine;
 use serde::Deserialize;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use url::Url;
 
 use crate::error::Fail;
@@ -90,10 +91,6 @@ impl ApiClient {
         })
     }
 
-    pub(crate) fn devapi_base(&self) -> &Url {
-        &self.devapi
-    }
-
     pub(crate) async fn post_token<T: Serialize + ?Sized>(
         &self,
         client_id: &str,
@@ -121,5 +118,37 @@ impl ApiClient {
         } else {
             Err(Fail::token_transport())
         }
+    }
+
+    pub(crate) async fn get_user<T: DeserializeOwned>(
+        &self,
+        access_token: &str,
+    ) -> Result<T, Fail> {
+        let url = self.user_url()?;
+        let authorization = format!("Bearer {access_token}");
+        let response = self
+            .http
+            .get(url)
+            .header(reqwest::header::AUTHORIZATION, authorization)
+            .send()
+            .await
+            .map_err(|_| Fail::user_api())?;
+        let status = response.status();
+        let bytes = response.bytes().await.map_err(|_| Fail::user_api())?;
+        if !status.is_success() {
+            return Err(Fail::user_api());
+        }
+        serde_json::from_slice(&bytes).map_err(|_| Fail::user_api())
+    }
+
+    fn user_url(&self) -> Result<Url, Fail> {
+        let mut base = self.devapi.clone();
+        // Url::join replaces the last segment unless the path ends with '/'.
+        if !base.path().ends_with('/') {
+            base.path_segments_mut()
+                .map_err(|_| Fail::bad_base_url())?
+                .push("");
+        }
+        base.join("user").map_err(|_| Fail::bad_base_url())
     }
 }

@@ -110,12 +110,15 @@ pub(crate) fn read_tokens(path: &Path) -> ReadTokens {
     }
 }
 
-pub(crate) fn expires_at(now: SystemTime, expires_in: i64) -> Result<i64, Fail> {
+pub(crate) fn unix_seconds(now: SystemTime) -> Result<i64, Fail> {
     let now_secs = now
         .duration_since(UNIX_EPOCH)
         .map_err(|_| Fail::expiry_overflow())?;
-    let now_i = i64::try_from(now_secs.as_secs()).map_err(|_| Fail::expiry_overflow())?;
-    now_i
+    i64::try_from(now_secs.as_secs()).map_err(|_| Fail::expiry_overflow())
+}
+
+pub(crate) fn expires_at(now: SystemTime, expires_in: i64) -> Result<i64, Fail> {
+    unix_seconds(now)?
         .checked_add(expires_in)
         .ok_or_else(Fail::expiry_overflow)
 }

@@ -3,6 +3,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Local};
 
+use crate::api::user::UserResponse;
 use crate::error::Fail;
 
 #[derive(Debug)]
@@ -35,12 +36,42 @@ pub(crate) fn print_success(json: bool, view: &SessionView) {
     let _ = write_stdout(&render_success(json, view));
 }
 
+pub(crate) fn render_user(json: bool, body: &UserResponse) -> String {
+    if json {
+        let text = serde_json::to_string(body).expect("user response serializes");
+        format!("{text}\n")
+    } else {
+        render_user_human(body)
+    }
+}
+
+pub(crate) fn print_user(json: bool, body: &UserResponse) {
+    let _ = write_stdout(&render_user(json, body));
+}
+
 pub(crate) fn print_fail(json: bool, fail: &Fail) {
     let _ = write_stderr(&render_fail(json, fail));
 }
 
 pub(crate) fn path_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+fn render_user_human(body: &UserResponse) -> String {
+    let user = &body.user;
+    format!(
+        "Имя: {}\nНомер: {}\nПочта: {}\nАватар: {}\nАвтор: {}\nЗаблокирован: {}\n",
+        user.name,
+        user.id,
+        user.email,
+        user.avatarUrl,
+        yes_no(user.flags.isAuthor),
+        yes_no(user.flags.isBanned),
+    )
+}
+
+fn yes_no(flag: bool) -> &'static str {
+    if flag { "да" } else { "нет" }
 }
 
 fn render_human(view: &SessionView) -> String {

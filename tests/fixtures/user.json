@@ -1,0 +1,13 @@
+{
+  "user": {
+    "id": 3000000001,
+    "name": "Nika Testova",
+    "email": "nika.fixture@invalid.test",
+    "avatarUrl": "https://avatars.invalid/fixture/nika-7k2.png",
+    "flags": {
+      "isAuthor": true,
+      "isBanned": false
+    },
+    "ignoredField": "fixture-extra-nika-7k2"
+  }
+}

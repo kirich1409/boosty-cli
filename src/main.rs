@@ -1,9 +1,11 @@
+mod api;
 mod auth;
 mod cli;
 mod client;
 mod config;
 mod error;
 mod output;
+mod user;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +19,11 @@ use clap::error::ErrorKind;
 use crate::auth::{LoginDeps, LoginRequest, SocketBinder};
 use crate::cli::{AuthCommand, Command};
 use crate::error::Fail;
+
+enum Ran {
+    Session(output::SessionView),
+    User(api::user::UserResponse),
+}
 
 #[tokio::main]
 async fn main() {
@@ -41,8 +48,12 @@ async fn dispatch() -> i32 {
         }
     };
     match run(parsed.command).await {
-        Ok(view) => {
+        Ok(Ran::Session(view)) => {
             output::print_success(parsed.json, &view);
+            0
+        }
+        Ok(Ran::User(body)) => {
+            output::print_user(parsed.json, &body);
             0
         }
         Err(fail) => {
@@ -52,7 +63,7 @@ async fn dispatch() -> i32 {
     }
 }
 
-async fn run(command: Command) -> Result<output::SessionView, Fail> {
+async fn run(command: Command) -> Result<Ran, Fail> {
     let env = config::Env::from_process();
     let hosts = client::resolve_hosts(
         env.authorize_url.as_deref(),
@@ -61,49 +72,60 @@ async fn run(command: Command) -> Result<output::SessionView, Fail> {
     )?;
     let authorize = hosts.authorize.clone();
     let http = client::ApiClient::build(client::HTTP_TIMEOUT, hosts)?;
-    // Parsed so a bad DevAPI override fails before the command. This slice does not request it.
-    let _devapi = http.devapi_base().clone();
     let path = config::token_path(
         env.token_path.as_deref(),
         env.xdg_config_home.as_deref(),
         env.home.as_deref(),
     )?;
     match command {
-        Command::Auth { action, .. } => match action {
-            AuthCommand::Login { .. } => {
-                auth::run_login(
-                    LoginRequest {
-                        client_id: env.client_id,
-                        client_secret: env.client_secret,
-                        redirect_url: env.redirect_url.unwrap_or_default(),
-                        authorize_endpoint: authorize,
-                        http,
-                        token_path: path,
-                        timeout: auth::LOGIN_TIMEOUT,
-                    },
-                    LoginDeps {
-                        opener: system_open,
-                        binder: SocketBinder,
-                        rename: rename_file,
-                        clock: SystemTime::now,
-                    },
-                    &mut io::stderr(),
-                )
-                .await
-            }
-            AuthCommand::Refresh { .. } => {
-                auth::run_refresh(
-                    env.client_id.as_deref(),
-                    env.client_secret.as_deref(),
-                    &path,
-                    &http,
-                    SystemTime::now,
-                    rename_file,
-                )
-                .await
-            }
-            AuthCommand::Status { .. } => auth::run_status(&path),
-        },
+        Command::Auth { action, .. } => {
+            let view = match action {
+                AuthCommand::Login { .. } => {
+                    auth::run_login(
+                        LoginRequest {
+                            client_id: env.client_id,
+                            client_secret: env.client_secret,
+                            redirect_url: env.redirect_url.unwrap_or_default(),
+                            authorize_endpoint: authorize,
+                            http,
+                            token_path: path,
+                            timeout: auth::LOGIN_TIMEOUT,
+                        },
+                        LoginDeps {
+                            opener: system_open,
+                            binder: SocketBinder,
+                            rename: rename_file,
+                            clock: SystemTime::now,
+                        },
+                        &mut io::stderr(),
+                    )
+                    .await
+                }
+                AuthCommand::Refresh { .. } => {
+                    auth::run_refresh(
+                        env.client_id.as_deref(),
+                        env.client_secret.as_deref(),
+                        &path,
+                        &http,
+                        SystemTime::now,
+                        rename_file,
+                    )
+                    .await
+                }
+                AuthCommand::Status { .. } => auth::run_status(&path),
+            };
+            view.map(Ran::Session)
+        }
+        Command::User { .. } => user::run_user(
+            env.client_id.as_deref(),
+            env.client_secret.as_deref(),
+            &path,
+            &http,
+            SystemTime::now,
+            rename_file,
+        )
+        .await
+        .map(Ran::User),
     }
 }
 

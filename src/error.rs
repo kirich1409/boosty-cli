@@ -175,6 +175,22 @@ impl Fail {
         )
     }
 
+    pub(crate) fn not_bearer() -> Self {
+        Self::new(
+            Kind::Auth,
+            "token type is not Bearer",
+            "Тип токена не Bearer.",
+        )
+    }
+
+    pub(crate) fn user_api() -> Self {
+        Self::new(
+            Kind::Api,
+            "user request failed",
+            "Не удалось получить пользователя.",
+        )
+    }
+
     pub(crate) fn kind(&self) -> Kind {
         self.kind
     }

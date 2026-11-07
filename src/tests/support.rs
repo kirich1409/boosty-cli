@@ -62,6 +62,7 @@ pub(crate) struct Hit {
 
 pub(crate) enum Reply {
     Status { status: u16, body: String },
+    NoContentType { status: u16, body: String },
     Silent,
     Close,
 }
@@ -75,14 +76,42 @@ pub(crate) struct Server {
 
 impl Server {
     pub(crate) fn spawn(reply: Reply) -> Self {
+        Self::spawn_inner(reply, None)
+    }
+
+    pub(crate) fn spawn_before_reply(
+        reply: Reply,
+        before_reply: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        Self::spawn_inner(reply, Some(Arc::new(before_reply)))
+    }
+
+    pub(crate) fn spawn_made(make: impl FnOnce(&str) -> Reply) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let reply = make(&format!("http://{addr}"));
+        Self::start(listener, reply, None)
+    }
+
+    fn spawn_inner(reply: Reply, before_reply: Option<Arc<dyn Fn() + Send + Sync>>) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        Self::start(listener, reply, before_reply)
+    }
+
+    fn start(
+        listener: TcpListener,
+        reply: Reply,
+        before_reply: Option<Arc<dyn Fn() + Send + Sync>>,
+    ) -> Self {
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
         let hits = Arc::new(Mutex::new(Vec::new()));
         let shutdown = Arc::new(AtomicBool::new(false));
         let hits_thread = Arc::clone(&hits);
         let shutdown_thread = Arc::clone(&shutdown);
-        let thread = thread::spawn(move || serve(listener, reply, hits_thread, shutdown_thread));
+        let thread = thread::spawn(move || {
+            serve(listener, reply, hits_thread, shutdown_thread, before_reply)
+        });
         Self {
             addr,
             hits,
@@ -118,6 +147,7 @@ fn serve(
     reply: Reply,
     hits: Arc<Mutex<Vec<Hit>>>,
     shutdown: Arc<AtomicBool>,
+    before_reply: Option<Arc<dyn Fn() + Send + Sync>>,
 ) {
     while !shutdown.load(Ordering::Relaxed) {
         match listener.accept() {
@@ -126,20 +156,16 @@ fn serve(
                 let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
                 if let Some(hit) = read_hit(&mut stream) {
                     hits.lock().unwrap().push(hit);
+                    if let Some(hook) = &before_reply {
+                        hook();
+                    }
                 }
                 match &reply {
                     Reply::Status { status, body } => {
-                        let reason = match *status {
-                            200..=299 => "OK",
-                            400..=499 => "Bad Request",
-                            _ => "Error",
-                        };
-                        let header = format!(
-                            "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                            body.len()
-                        );
-                        let _ = stream.write_all(header.as_bytes());
-                        let _ = stream.write_all(body.as_bytes());
+                        write_status(&mut stream, *status, body, true);
+                    }
+                    Reply::NoContentType { status, body } => {
+                        write_status(&mut stream, *status, body, false);
                     }
                     Reply::Silent => {
                         while !shutdown.load(Ordering::Relaxed) {
@@ -155,6 +181,25 @@ fn serve(
             Err(_) => break,
         }
     }
+}
+
+fn write_status(stream: &mut TcpStream, status: u16, body: &str, content_type: bool) {
+    let reason = match status {
+        200..=299 => "OK",
+        400..=499 => "Bad Request",
+        _ => "Error",
+    };
+    let content_type = if content_type {
+        "Content-Type: application/json\r\n"
+    } else {
+        ""
+    };
+    let header = format!(
+        "HTTP/1.1 {status} {reason}\r\n{content_type}Content-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(header.as_bytes());
+    let _ = stream.write_all(body.as_bytes());
 }
 
 fn read_hit(stream: &mut TcpStream) -> Option<Hit> {
@@ -257,10 +302,14 @@ pub(crate) fn token_body(access: &str, refresh: &str, token_type: &str, expires_
 }
 
 pub(crate) fn client_for(token_url: &str, timeout: Duration) -> ApiClient {
+    client_for_bases(token_url, "http://127.0.0.1:9/v1", timeout)
+}
+
+pub(crate) fn client_for_bases(token_url: &str, devapi_base: &str, timeout: Duration) -> ApiClient {
     let hosts = client::resolve_hosts(
         Some("http://127.0.0.1:9/authorize"),
         Some(token_url),
-        Some("http://127.0.0.1:9/v1"),
+        Some(devapi_base),
     )
     .unwrap();
     ApiClient::build(timeout, hosts).unwrap()
