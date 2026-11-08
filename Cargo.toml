@@ -6,7 +6,7 @@ publish = false
 description = "Local CLI for the Boosty DevAPI"
 repository = "https://github.com/kirich1409/boosty-cli"
 readme = "README.md"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [[bin]]
 name = "boosty"

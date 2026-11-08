@@ -122,7 +122,7 @@ brew install kirich1409/boosty-cli/boosty
 
 Четыре URL выбираются блоками Homebrew `on_macos` / `on_linux` и `on_arm` / `on_intel`. Внутри `install` эти блоки не используются. На macOS arm — `macos-aarch64`, на macOS intel — `macos-x86_64`, на Linux arm — `linux-aarch64`, на Linux intel — `linux-x86_64`. Windows в формуле нет.
 
-Лицензия формулы — `license any_of: ["MIT", "Apache-2.0"]`. Это та же двойная лицензия `MIT OR Apache-2.0`, не выбор одной. `homepage` — `https://github.com/kirich1409/boosty-cli`.
+Лицензия формулы — `license "MIT"`. Это единственная лицензия проекта, не двойная. `homepage` — `https://github.com/kirich1409/boosty-cli`.
 
 SHA-256 в формуле обязателен для реальной установки, но в этом срезе его нет: архива ещё нет, сумму выдумывать нельзя. Позже workflow пишет в формулу суммы из `SHA256SUMS` того релиза, который сам собрал, и коммитит это вместе с changelog. До этого в формуле нет 64-значной hex-суммы.
 
@@ -140,7 +140,7 @@ scoop install https://raw.githubusercontent.com/kirich1409/boosty-cli/main/bucke
 
 Это установка манифеста по URL, как в справке `scoop install`. `scoop bucket add` в README нет.
 
-Файл — `bucket/boosty.json`. Поля: `version` равен номеру из `Cargo.toml`, `url` — windows-архив из шаблона для этого номера, `bin` — `boosty.exe`, `license` — `MIT|Apache-2.0`. Архитектура только 64-bit: других windows-архивов job не собирает. `hash` в этом срезе нет, по той же причине, что нет `sha256` в формуле. Workflow дописывает SHA-256 из `SHA256SUMS`. Префикса `sha1:` и `md5:` нет.
+Файл — `bucket/boosty.json`. Поля: `version` равен номеру из `Cargo.toml`, `url` — windows-архив из шаблона для этого номера, `bin` — `boosty.exe`, `license` — `MIT`. Архитектура только 64-bit: других windows-архивов job не собирает. `hash` в этом срезе нет, по той же причине, что нет `sha256` в формуле. Workflow дописывает SHA-256 из `SHA256SUMS`. Префикса `sha1:` и `md5:` нет.
 
 ## README
 
@@ -162,7 +162,7 @@ cargo install --git https://github.com/kirich1409/boosty-cli
 
 ## Лицензия и publish
 
-`LICENSE-MIT`, `LICENSE-APACHE` и `license = "MIT OR Apache-2.0"` уже в дереве. Copyright holder — `kirich1409`. Срез файлы лицензии не переписывает и другую лицензию не выбирает. `publish = false` не меняется. `cargo publish` в workflow нет.
+Единственная лицензия — MIT, файл `LICENSE`, `license = "MIT"`. Copyright holder — `kirich1409`. `LICENSE-APACHE` и `LICENSE-MIT` не используются. `publish = false` не меняется. `cargo publish` в workflow нет.
 
 ## Workflow проверок
 
@@ -187,7 +187,7 @@ cargo install --git https://github.com/kirich1409/boosty-cli
 - строка шаблона есть в README, `Formula/boosty.rb` и `bucket/boosty.json`; конкретные URL архивов — только её подстановки для номера из `Cargo.toml`
 - команды README — двухаргументный tap этого URL, `brew install kirich1409/boosty-cli/boosty`, scoop по raw URL манифеста из `bucket/boosty.json` и точный `cargo install --git https://github.com/kirich1409/boosty-cli`
 - нет `homebrew-`, одноаргументного tap, `scoop bucket add`, `winget`, `crates.io`, `cargo binstall` и `publish = true`
-- формула указывает `license any_of: ["MIT", "Apache-2.0"]`; манифест — `MIT|Apache-2.0`; версия манифеста равна `Cargo.toml`
+- формула указывает `license "MIT"`; манифест — `MIT`; версия манифеста равна `Cargo.toml`
 - в формуле и манифесте нет выдуманной 64-значной hex-суммы
 - `CHANGELOG.md` есть и не содержит секцию `## 0.1.0`; workflow дописывает `##` + номер, а не переписывает старые секции
 - `AGENTS.md` содержит правило релиза и не теряет уже записанный контракт команд

@@ -10,7 +10,7 @@ publish = false
 description = "Local CLI for the Boosty DevAPI"
 repository = "https://github.com/kirich1409/boosty-cli"
 readme = "README.md"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [[bin]]
 name = "boosty"
@@ -142,9 +142,8 @@ fn readme_describes_existing_surface() {
         "Один запуск делает один запрос и одну страницу",
         "Страницы внутри команды не обходятся",
         "собирает бинарник `boosty`",
-        "двойной лицензии `MIT OR Apache-2.0`",
-        "`LICENSE-MIT`",
-        "`LICENSE-APACHE`",
+        "лицензии MIT",
+        "`LICENSE`",
     ] {
         assert_has(&path, check, &text, needle);
     }
@@ -211,7 +210,7 @@ fn cargo_toml_adds_only_metadata() {
         "description = \"Local CLI for the Boosty DevAPI\"",
         "repository = \"https://github.com/kirich1409/boosty-cli\"",
         "readme = \"README.md\"",
-        "license = \"MIT OR Apache-2.0\"",
+        "license = \"MIT\"",
         "publish = false",
         "name = \"boosty-cli\"",
         "version = \"0.1.0\"",
@@ -232,7 +231,7 @@ fn cargo_toml_adds_only_metadata() {
 
 #[test]
 fn license_mit_is_standard_text() {
-    let path = root().join("LICENSE-MIT");
+    let path = root().join("LICENSE");
     let text = read_text(&path);
     let check = "license_mit_is_standard_text";
     assert_eq!(
@@ -252,60 +251,12 @@ fn license_mit_is_standard_text() {
 }
 
 #[test]
-fn license_apache_is_standard_text() {
-    let path = root().join("LICENSE-APACHE");
-    let bytes = fs::read(&path).unwrap_or_else(|err| panic!("{}: read: {err}", path.display()));
-    let text = read_text(&path);
-    let check = "license_apache_is_standard_text";
-    let copyrights = text
-        .lines()
-        .filter(|line| line.trim_start_matches(' ') == "Copyright 2026 kirich1409")
-        .count();
-    assert_eq!(
-        copyrights,
-        1,
-        "{}: {check}: copyright line count {copyrights}",
-        path.display()
-    );
-    for needle in [
-        "Copyright [yyyy]",
-        "[yyyy]",
-        "name of copyright owner",
-        "(c) 2026",
-    ] {
-        assert_lacks(&path, check, &text, needle);
+fn apache_license_is_absent() {
+    let check = "apache_license_is_absent";
+    for name in ["LICENSE-APACHE", "LICENSE-MIT", "NOTICE"] {
+        let path = root().join(name);
+        assert!(!path.exists(), "{}: {check}: {name} exists", path.display());
     }
-    for needle in [
-        "Apache License",
-        "Version 2.0, January 2004",
-        "1. Definitions.",
-        "2. Grant of Copyright License.",
-        "3. Grant of Patent License.",
-        "4. Redistribution.",
-        "5. Submission of Contributions.",
-        "6. Trademarks.",
-        "7. Disclaimer of Warranty.",
-        "8. Limitation of Liability.",
-        "9. Accepting Warranty or Additional Liability.",
-        "END OF TERMS AND CONDITIONS",
-        "APPENDIX: How to apply the Apache License to your work.",
-        "(Don't include",
-        "the brackets!)",
-    ] {
-        assert_has(&path, check, &text, needle);
-    }
-    assert!(
-        bytes.len() >= 9000,
-        "{}: {check}: length {}",
-        path.display(),
-        bytes.len()
-    );
-    let notice = root().join("NOTICE");
-    assert!(
-        !notice.exists(),
-        "{}: {check}: NOTICE exists",
-        notice.display()
-    );
 }
 
 #[test]

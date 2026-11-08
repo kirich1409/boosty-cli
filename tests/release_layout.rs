@@ -374,12 +374,8 @@ fn install_channels_share_one_release_template() {
     assert_lacks(&formula_path, &formula, &windows);
     assert!(formula.contains(&format!("version \"{version}\"")));
     assert!(manifest.contains(&format!("\"version\": \"{version}\"")));
-    assert_has(
-        &formula_path,
-        &formula,
-        "license any_of: [\"MIT\", \"Apache-2.0\"]",
-    );
-    assert_has(&manifest_path, &manifest, "\"license\": \"MIT|Apache-2.0\"");
+    assert_has(&formula_path, &formula, "license \"MIT\"");
+    assert_has(&manifest_path, &manifest, "\"license\": \"MIT\"");
     assert_has(&manifest_path, &manifest, "\"bin\": \"boosty.exe\"");
     assert!(manifest.contains(&format!("\"##\": \"{TEMPLATE}\"")));
     assert_eq!(manifest.matches("\"url\"").count(), 1);

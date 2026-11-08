@@ -76,4 +76,4 @@ cargo install --git https://github.com/kirich1409/boosty-cli
 
 ## Лицензия
 
-Код доступен по двойной лицензии `MIT OR Apache-2.0`. Тексты: `LICENSE-MIT` и `LICENSE-APACHE`.
+Код доступен по лицензии MIT. Текст: `LICENSE`.

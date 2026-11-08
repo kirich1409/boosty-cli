@@ -2,7 +2,7 @@
 class Boosty < Formula
   homepage "https://github.com/kirich1409/boosty-cli"
   version "0.1.0"
-  license any_of: ["MIT", "Apache-2.0"]
+  license "MIT"
 
   on_macos do
     on_arm do

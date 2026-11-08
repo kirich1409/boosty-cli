@@ -2,6 +2,6 @@
   "version": "0.1.0",
   "url": "https://github.com/kirich1409/boosty-cli/releases/download/v0.1.0/boosty-windows-x86_64.zip",
   "bin": "boosty.exe",
-  "license": "MIT|Apache-2.0",
+  "license": "MIT",
   "##": "https://github.com/kirich1409/boosty-cli/releases/download/v{version}/boosty-{target}.{ext}"
 }
